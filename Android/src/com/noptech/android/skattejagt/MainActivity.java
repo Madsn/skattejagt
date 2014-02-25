@@ -44,12 +44,16 @@ public class MainActivity extends Activity implements OnClickListener {
 
 	private Button btnGetLocation = null;
 	private EditText editLocation = null;
+	private EditText longitudeTxt = null;
+	private EditText latitudeTxt = null;
 	private ProgressBar pb = null;
 
 	private static final String TAG = "Debug";
 	private Boolean flag = false;
 
 	private Location goal = new Location("dummyprovider");
+	private Sensor accelerometer;
+	private Sensor magnetometer;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -59,13 +63,12 @@ public class MainActivity extends Activity implements OnClickListener {
 		// if you want to lock screen for always Portrait mode
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-		goal.setLatitude(56.16);
-		goal.setLongitude(10.2);
-
 		pb = (ProgressBar) findViewById(R.id.progressBar1);
 		pb.setVisibility(View.INVISIBLE);
 
 		editLocation = (EditText) findViewById(R.id.editTextLocation);
+		latitudeTxt = (EditText) findViewById(R.id.latitudeTxt);
+		longitudeTxt = (EditText) findViewById(R.id.longitudeTxt);
 
 		btnGetLocation = (Button) findViewById(R.id.btnLocation);
 		btnGetLocation.setOnClickListener(this);
@@ -73,6 +76,23 @@ public class MainActivity extends Activity implements OnClickListener {
 		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 
+	}
+
+	public void onGetCoordsClick(View v) {
+		if (loc == null) {
+			Toast.makeText(getBaseContext(), "Location is null",
+					Toast.LENGTH_SHORT).show();
+			return;
+		}
+		latitudeTxt.setText(Double.toString(loc.getLatitude()));
+		longitudeTxt.setText(Double.toString(loc.getLongitude()));
+	}
+
+	public void onSetCoordsClick(View v) {
+		if (latitudeTxt.getText().toString() != "" && longitudeTxt.getText().toString() != ""){
+			goal.setLatitude(Double.parseDouble(latitudeTxt.getText().toString()));
+			goal.setLongitude(Double.parseDouble(longitudeTxt.getText().toString()));
+		}
 	}
 
 	@Override
@@ -87,13 +107,19 @@ public class MainActivity extends Activity implements OnClickListener {
 							+ "\nWait..");
 
 			pb.setVisibility(View.VISIBLE);
-			
+
 			sensorListener = new MySensorListener();
 			locationManager.requestLocationUpdates(
 					LocationManager.GPS_PROVIDER, 5000, 10, sensorListener);
-			sensorManager.registerListener((SensorEventListener) sensorListener, 
-					sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), 
-					SensorManager.SENSOR_DELAY_NORMAL);
+
+			accelerometer = sensorManager
+					.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+			magnetometer = sensorManager
+					.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+			sensorManager.registerListener(sensorListener, accelerometer,
+					SensorManager.SENSOR_DELAY_UI);
+			sensorManager.registerListener(sensorListener, magnetometer,
+					SensorManager.SENSOR_DELAY_UI);
 		} else {
 			alertbox("Gps Status!!", "Your GPS is: OFF");
 		}
@@ -152,44 +178,50 @@ public class MainActivity extends Activity implements OnClickListener {
 		alert.show();
 	}
 
-	private class MySensorListener implements SensorEventListener, LocationListener {
+	private class MySensorListener implements SensorEventListener,
+			LocationListener {
 
 		@Override
 		public void onLocationChanged(Location location) {
 			Log.v(TAG, "onLocationChanged triggered");
 			loc = location;
 		}
-		
-		@Override
-		public void onSensorChanged(SensorEvent event) {
-			//Log.v(TAG, "onSensorChanged triggered");
-			if (loc == null) {
-				Log.v(TAG, "Location is null");
-				return;
-			}
-			if (event.sensor.getType() != Sensor.TYPE_MAGNETIC_FIELD) {
-				Log.v(TAG, "Sensor type is not magnetic field, but: "
-						+ event.sensor.getType());
-				return;
-			}
-			//Log.v(TAG, "Event values: " + event.values[0]);
-			
-			float azimuth = event.values[0];
-			float baseAzimuth = azimuth;
 
+		float[] mGravity;
+		float[] mGeomagnetic;
+		private double azimuth;
+		private double baseAzimuth;
+
+		public void onSensorChanged(SensorEvent event) {
+			if (loc == null)
+				return;
+			if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER)
+				mGravity = event.values;
+			if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD)
+				mGeomagnetic = event.values;
+			if (mGravity == null || mGeomagnetic == null)
+				return;
+			float R[] = new float[9];
+			float I[] = new float[9];
+			boolean success = SensorManager.getRotationMatrix(R, I, mGravity,
+					mGeomagnetic);
+			if (success) {
+				float orientation[] = new float[3];
+				SensorManager.getOrientation(R, orientation);
+				baseAzimuth = Math.toDegrees(orientation[0]); // orientation
+																// contains:
+																// azimut,
+				// pitch and roll
+				baseAzimuth = (baseAzimuth + 360) % 360;
+			}
+			azimuth = baseAzimuth;
 			editLocation.setText("");
 			pb.setVisibility(View.INVISIBLE);
-			/*
-			Toast.makeText(
-			 					getBaseContext(),
-					"Location changed : Lat: " + loc.getLatitude() + " Lng: "
-							+ loc.getLongitude(), Toast.LENGTH_SHORT).show();
-			*/
 			String longitude = "Longitude: " + loc.getLongitude();
-			//Log.v(TAG, longitude);
+			// Log.v(TAG, longitude);
 			String latitude = "Latitude: " + loc.getLatitude();
-			//Log.v(TAG, latitude);
-			
+			// Log.v(TAG, latitude);
+
 			float distance = loc.distanceTo(goal);
 			float bearing = loc.bearingTo(goal);
 			Log.v(TAG, "getting geofield");
@@ -207,35 +239,104 @@ public class MainActivity extends Activity implements OnClickListener {
 			}
 
 			// This is where we choose to point it
-			float direction = bearing - azimuth;
+			Double direction = bearing - azimuth;
 
 			// If the direction is smaller than 0, add 360 to get the rotation
 			// clockwise.
 			if (direction < 0) {
 				direction = direction + 360;
 			}
-			
+
 			String bearingText = "N";
 
-		    if ( (360 >= baseAzimuth && baseAzimuth >= 337.5) || (0 <= baseAzimuth && baseAzimuth <= 22.5) ) bearingText = "N";
-		    else if (baseAzimuth > 22.5 && baseAzimuth < 67.5) bearingText = "NE";
-		    else if (baseAzimuth >= 67.5 && baseAzimuth <= 112.5) bearingText = "E";
-		    else if (baseAzimuth > 112.5 && baseAzimuth < 157.5) bearingText = "SE";
-		    else if (baseAzimuth >= 157.5 && baseAzimuth <= 202.5) bearingText = "S";
-		    else if (baseAzimuth > 202.5 && baseAzimuth < 247.5) bearingText = "SW";
-		    else if (baseAzimuth >= 247.5 && baseAzimuth <= 292.5) bearingText = "W";
-		    else if (baseAzimuth > 292.5 && baseAzimuth < 337.5) bearingText = "NW";
-		    else bearingText = "?";
+			if ((360 >= baseAzimuth && baseAzimuth >= 337.5)
+					|| (0 <= baseAzimuth && baseAzimuth <= 22.5))
+				bearingText = "N";
+			else if (baseAzimuth > 22.5 && baseAzimuth < 67.5)
+				bearingText = "NE";
+			else if (baseAzimuth >= 67.5 && baseAzimuth <= 112.5)
+				bearingText = "E";
+			else if (baseAzimuth > 112.5 && baseAzimuth < 157.5)
+				bearingText = "SE";
+			else if (baseAzimuth >= 157.5 && baseAzimuth <= 202.5)
+				bearingText = "S";
+			else if (baseAzimuth > 202.5 && baseAzimuth < 247.5)
+				bearingText = "SW";
+			else if (baseAzimuth >= 247.5 && baseAzimuth <= 292.5)
+				bearingText = "W";
+			else if (baseAzimuth > 292.5 && baseAzimuth < 337.5)
+				bearingText = "NW";
+			else
+				bearingText = "?";
 
 			String s = longitude + "\n" + latitude + "\n\nDistance to goal: "
 					+ distance + " m" + "\n\nDirection to goal: " + direction
 					+ "\nBearing: " + bearing + "\nAzimuth: " + azimuth
 					+ "\nBase azimuth: " + baseAzimuth
-					+ "\nCompass direction: " + bearingText + "\n"+ Integer.toString(counter);
+					+ "\nCompass direction: " + bearingText + "\n"
+					+ Integer.toString(counter);
 			counter++;
 			editLocation.setText(s);
 		}
 
+		/*
+		 * @Override public void onSensorChanged(SensorEvent event) { //
+		 * Log.v(TAG, "onSensorChanged triggered"); if (loc == null) {
+		 * Log.v(TAG, "Location is null"); return; } if (event.sensor.getType()
+		 * != Sensor.TYPE_MAGNETIC_FIELD) { Log.v(TAG,
+		 * "Sensor type is not magnetic field, but: " + event.sensor.getType());
+		 * return; } // Log.v(TAG, "Event values: " + event.values[0]);
+		 * 
+		 * float azimuth = event.values[0]; float baseAzimuth = azimuth;
+		 * 
+		 * editLocation.setText(""); pb.setVisibility(View.INVISIBLE);
+		 * 
+		 * // Toast.makeText( getBaseContext(), "Location changed : Lat: " + //
+		 * loc.getLatitude() + " Lng: " + loc.getLongitude(), //
+		 * Toast.LENGTH_SHORT).show();
+		 * 
+		 * String longitude = "Longitude: " + loc.getLongitude(); // Log.v(TAG,
+		 * longitude); String latitude = "Latitude: " + loc.getLatitude(); //
+		 * Log.v(TAG, latitude);
+		 * 
+		 * float distance = loc.distanceTo(goal); float bearing =
+		 * loc.bearingTo(goal); Log.v(TAG, "getting geofield"); GeomagneticField
+		 * geoField = new GeomagneticField(Double.valueOf(
+		 * loc.getLatitude()).floatValue(), Double.valueOf(
+		 * loc.getLongitude()).floatValue(), Double.valueOf(
+		 * loc.getAltitude()).floatValue(), System.currentTimeMillis());
+		 * 
+		 * Log.v(TAG, "Got geofield"); azimuth -= geoField.getDeclination(); //
+		 * converts magnetic north // into true north
+		 * 
+		 * if (bearing < 0) { bearing = bearing + 360; }
+		 * 
+		 * // This is where we choose to point it float direction = bearing -
+		 * azimuth;
+		 * 
+		 * // If the direction is smaller than 0, add 360 to get the rotation //
+		 * clockwise. if (direction < 0) { direction = direction + 360; }
+		 * 
+		 * String bearingText = "N";
+		 * 
+		 * if ((360 >= baseAzimuth && baseAzimuth >= 337.5) || (0 <= baseAzimuth
+		 * && baseAzimuth <= 22.5)) bearingText = "N"; else if (baseAzimuth >
+		 * 22.5 && baseAzimuth < 67.5) bearingText = "NE"; else if (baseAzimuth
+		 * >= 67.5 && baseAzimuth <= 112.5) bearingText = "E"; else if
+		 * (baseAzimuth > 112.5 && baseAzimuth < 157.5) bearingText = "SE"; else
+		 * if (baseAzimuth >= 157.5 && baseAzimuth <= 202.5) bearingText = "S";
+		 * else if (baseAzimuth > 202.5 && baseAzimuth < 247.5) bearingText =
+		 * "SW"; else if (baseAzimuth >= 247.5 && baseAzimuth <= 292.5)
+		 * bearingText = "W"; else if (baseAzimuth > 292.5 && baseAzimuth <
+		 * 337.5) bearingText = "NW"; else bearingText = "?";
+		 * 
+		 * String s = longitude + "\n" + latitude + "\n\nDistance to goal: " +
+		 * distance + " m" + "\n\nDirection to goal: " + direction +
+		 * "\nBearing: " + bearing + "\nAzimuth: " + azimuth +
+		 * "\nBase azimuth: " + baseAzimuth + "\nCompass direction: " +
+		 * bearingText + "\n" + Integer.toString(counter); counter++;
+		 * editLocation.setText(s); }
+		 */
 		@Override
 		public void onAccuracyChanged(Sensor sensor, int accuracy) {
 			// TODO Auto-generated method stub
@@ -245,19 +346,19 @@ public class MainActivity extends Activity implements OnClickListener {
 		@Override
 		public void onStatusChanged(String provider, int status, Bundle extras) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		@Override
 		public void onProviderEnabled(String provider) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		@Override
 		public void onProviderDisabled(String provider) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 	}

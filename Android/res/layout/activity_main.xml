@@ -32,15 +32,96 @@
 			android:text="Get Location"
 			android:id="@+id/btnLocation"></Button>
 	</LinearLayout>
+
 	<LinearLayout
-		android:id="@+id/layloadingH"
-		android:layout_height="wrap_content"
-		android:layout_weight="0.20"
-		android:layout_width="fill_parent"
-		android:gravity="center">
-		<ProgressBar
-			android:layout_width="wrap_content"
-			android:id="@+id/progressBar1"
-			android:layout_height="wrap_content"></ProgressBar>
+	    android:id="@+id/layloadingH"
+	    android:layout_width="fill_parent"
+	    android:layout_height="wrap_content"
+	    android:gravity="center" >
+
+	    <ProgressBar
+	        android:id="@+id/progressBar1"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content" />
 	</LinearLayout>
+
+
+
+		<RelativeLayout
+		    android:layout_width="match_parent"
+		    android:layout_height="wrap_content" >
+
+			<TextView
+			    android:id="@+id/textView1"
+			    android:layout_width="wrap_content"
+			    android:layout_height="wrap_content"
+			    android:layout_alignParentRight="true"
+			    android:layout_alignParentTop="true"
+			    android:layout_marginRight="77dp"
+			    android:text="Longitude" />
+
+			<TextView
+			    android:id="@+id/TextView01"
+			    android:layout_width="wrap_content"
+			    android:layout_height="wrap_content"
+			    android:layout_alignParentTop="true"
+			    android:layout_marginRight="43dp"
+			    android:layout_toLeftOf="@+id/textView1"
+			    android:text="Goal: Latitude" />
+
+		</RelativeLayout>
+
+		<RelativeLayout
+		    android:layout_width="match_parent"
+		    android:layout_height="wrap_content"
+		    android:layout_weight="0.08" >
+
+			<EditText
+			    android:id="@+id/longitudeTxt"
+			    android:layout_width="wrap_content"
+			    android:layout_height="wrap_content"
+			    android:layout_alignParentTop="true"
+			    android:layout_toRightOf="@+id/latitudeTxt"
+			    android:ems="5"
+			    android:inputType="numberDecimal" />
+
+			<EditText
+			    android:id="@+id/latitudeTxt"
+			    android:layout_width="wrap_content"
+			    android:layout_height="wrap_content"
+			    android:layout_alignParentLeft="true"
+			    android:layout_alignParentTop="true"
+			    android:layout_marginLeft="50dp"
+			    android:ems="5"
+			    android:inputType="numberDecimal" />
+
+		</RelativeLayout>
+
+		<RelativeLayout
+		    android:layout_width="match_parent"
+		    android:layout_height="wrap_content"
+		    android:layout_weight="0.20" >
+
+			<Button
+			    android:id="@+id/getCoordsBtn"
+			    android:layout_width="wrap_content"
+			    android:layout_height="wrap_content"
+			    android:layout_alignParentLeft="true"
+			    android:layout_alignParentTop="true"
+			    android:layout_marginLeft="81dp"
+			    android:text="Get" 
+			    android:onClick="onGetCoordsClick"/>
+
+			<Button
+			    android:id="@+id/setCoordsBtn"
+			    android:layout_width="wrap_content"
+			    android:layout_height="wrap_content"
+			    android:layout_alignParentTop="true"
+			    android:layout_marginLeft="36dp"
+			    android:layout_toRightOf="@+id/getCoordsBtn"
+			    android:text="Set" 
+			    android:onClick="onSetCoordsClick" />
+
+		</RelativeLayout>
+
 </LinearLayout>
